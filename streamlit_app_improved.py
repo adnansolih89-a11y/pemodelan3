@@ -96,23 +96,19 @@ st.markdown("""
 # HELPER FUNCTIONS
 # ==========================================
 @st.cache_resource
-def load_embedding_model():
+def load_embedding_model(_version="v2"):
     """Load sentence transformer model untuk embedding"""
     logging.info("Starting load_embedding_model")
-    with st.spinner("📥 Loading embedding model..."):
-        model = SentenceTransformer("all-MiniLM-L6-v2")
+    model = SentenceTransformer("all-MiniLM-L6-v2")
     logging.info("Completed load_embedding_model")
-    st.toast("✅ Embedding model loaded!", icon='✅')
     return model
 
 @st.cache_resource
-def load_sentiment_model():
+def load_sentiment_model(_version="v2"):
     """Load sentiment analysis model"""
     logging.info("Starting load_sentiment_model")
-    with st.spinner("📥 Loading sentiment model..."):
-        model = pipeline("sentiment-analysis", model="cardiffnlp/twitter-roberta-base-sentiment-latest")
+    model = pipeline("sentiment-analysis", model="cardiffnlp/twitter-roberta-base-sentiment-latest")
     logging.info("Completed load_sentiment_model")
-    st.toast("✅ Sentiment model loaded!", icon='✅')
     return model
 
 def cached_fit_transform(_topic_model, _docs):
