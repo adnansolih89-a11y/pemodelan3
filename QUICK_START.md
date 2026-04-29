@@ -157,11 +157,32 @@ pip install streamlit-lottie>=0.0.5
 
 ### ❌ Error: "Gensim not available"
 
-**Solusi:**
+**Gejala:** Muncul warning "Topic Coherence Evaluation: Gensim library not available"
+
+**Apa yang terjadi:**
+- Aplikasi akan otomatis menggunakan **metode fallback** untuk menghitung pseudo-coherence
+- Hasilnya kurang akurat tapi tetap memberikan indikasi kualitas topik
+- Muncul pesan: "Fallback coherence berhasil dihitung!"
+
+**Solusi untuk hasil akurat:**
 ```bash
-pip install gensim
+# Install gensim dengan versi yang kompatibel
+pip install gensim>=4.0.0
+
+# Atau update semua dependencies
+pip install -r requirements.txt
 ```
 
+**Jika masih error:**
+```bash
+# Coba install versi spesifik
+pip install gensim==4.3.2
+
+# Atau gunakan conda jika menggunakan conda environment
+conda install -c conda-forge gensim
+```
+
+**Alternatif:** Aplikasi akan tetap berjalan normal dengan fallback method.
 ### ❌ Animasi Lottie tidak muncul
 
 **Solusi:**

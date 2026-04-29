@@ -137,59 +137,147 @@ def cached_topics_over_time(_topic_model, _docs, _timestamps, _nr_bins=20):
 def calculate_topic_coherence(_topic_model, _docs, coherence_type='c_v'):
     """Hitung topic coherence menggunakan gensim CoherenceModel"""
     logging.info(f"Menghitung topic coherence dengan measure {coherence_type}")
-    
+
     try:
-        from gensim.models import CoherenceModel
-        from gensim.corpora import Dictionary
-    except ImportError as e:
-        logging.error(f"Gensim tidak tersedia: {e}")
-        return {"error": "Gensim library tidak tersedia. Silakan install gensim untuk menghitung coherence."}
-    
+        # Try to import gensim modules
+        try:
+            from gensim.models import CoherenceModel
+            from gensim.corpora import Dictionary
+            from gensim import corpora
+            logging.info("Gensim modules imported successfully")
+        except ImportError as e:
+            logging.error(f"Gensim import failed: {e}")
+            # Try alternative import paths
+            try:
+                import gensim
+                from gensim.models.coherencemodel import CoherenceModel
+                from gensim.corpora.dictionary import Dictionary
+                logging.info("Alternative gensim imports successful")
+            except ImportError as e2:
+                logging.error(f"Alternative gensim import also failed: {e2}")
+                return {"error": f"Gensim library tidak tersedia. Error: {str(e)}. Silakan install dengan: pip install gensim"}
+
+    except Exception as e:
+        logging.error(f"Unexpected error during gensim import: {e}")
+        return {"error": f"Error importing gensim: {str(e)}. Pastikan gensim terinstall dengan benar."}
+
     try:
         topics = _topic_model.get_topics()
         topics = {k: v for k, v in topics.items() if k != -1}
-        
+
         if not topics:
             logging.warning("Tidak ada topik valid untuk coherence calculation")
             return {"error": "Tidak ada topik valid ditemukan"}
-        
+
+        # Prepare documents for coherence calculation
         tokenized_docs = [doc.split() for doc in _docs if doc.strip()]
-        dictionary = Dictionary(tokenized_docs)
-        dictionary.filter_extremes(no_below=5, no_above=0.5)
-        corpus = [dictionary.doc2bow(doc) for doc in tokenized_docs]
-        
+
+        if not tokenized_docs:
+            return {"error": "Tidak ada dokumen yang valid untuk coherence calculation"}
+
+        # Create dictionary and corpus
+        try:
+            dictionary = Dictionary(tokenized_docs)
+            dictionary.filter_extremes(no_below=5, no_above=0.5)
+
+            if len(dictionary) == 0:
+                return {"error": "Dictionary kosong setelah filtering. Coba kurangi no_below atau tingkatkan jumlah dokumen."}
+
+            corpus = [dictionary.doc2bow(doc) for doc in tokenized_docs]
+        except Exception as e:
+            logging.error(f"Error creating dictionary/corpus: {e}")
+            return {"error": f"Error preparing data untuk coherence: {str(e)}"}
+
+        # Prepare topic words
         topic_words = []
         for topic_id in sorted(topics.keys()):
             words = [word for word, _ in topics[topic_id][:10]]
-            topic_words.append(words)
-        
-        coherence_model = CoherenceModel(
-            topics=topic_words,
-            texts=tokenized_docs,
-            corpus=corpus,
-            dictionary=dictionary,
-            coherence=coherence_type
-        )
-        
-        topic_coherences = coherence_model.get_coherence_per_topic()
-        overall_coherence = coherence_model.get_coherence()
-        
-        results = {
-            'overall_coherence': overall_coherence,
-            'topic_coherences': topic_coherences,
-            'coherence_type': coherence_type,
-            'num_topics': len(topic_words)
-        }
-        
-        logging.info(f"Coherence calculation completed: {overall_coherence:.4f}")
-        return results
-        
+            if words:  # Only add if there are words
+                topic_words.append(words)
+
+        if not topic_words:
+            return {"error": "Tidak ada topic words yang valid"}
+
+        # Calculate coherence
+        try:
+            coherence_model = CoherenceModel(
+                topics=topic_words,
+                texts=tokenized_docs,
+                corpus=corpus,
+                dictionary=dictionary,
+                coherence=coherence_type
+            )
+
+            topic_coherences = coherence_model.get_coherence_per_topic()
+            overall_coherence = coherence_model.get_coherence()
+
+            results = {
+                'overall_coherence': overall_coherence,
+                'topic_coherences': topic_coherences,
+                'coherence_type': coherence_type,
+                'num_topics': len(topic_words)
+            }
+
+            logging.info(f"Coherence calculation completed: {overall_coherence:.4f}")
+            return results
+
+        except Exception as e:
+            logging.error(f"Error during coherence calculation: {e}")
+            return {"error": f"Error menghitung coherence: {str(e)}. Coba gunakan coherence_type yang berbeda."}
+
     except Exception as e:
-        logging.error(f"Error calculating coherence: {e}")
-        return {"error": str(e)}
+        logging.error(f"Unexpected error in coherence calculation: {e}")
+        return {"error": f"Error tak terduga: {str(e)}"}
 
 @st.cache_data
-def calculate_topic_metrics(_topic_model, _docs):
+def calculate_topic_coherence_fallback(_topic_model, _docs):
+    """Fallback coherence calculation tanpa gensim - menggunakan metrik sederhana"""
+    logging.info("Menghitung topic coherence dengan metode fallback (tanpa gensim)")
+
+    try:
+        topics = _topic_model.get_topics()
+        topics = {k: v for k, v in topics.items() if k != -1}
+
+        if not topics:
+            return {"error": "Tidak ada topik valid ditemukan"}
+
+        # Metrik sederhana: rata-rata panjang topik dan variasi kata
+        topic_lengths = []
+        unique_words = set()
+        word_weights = []
+
+        for topic_id, words_weights in topics.items():
+            topic_words = [word for word, weight in words_weights[:10]]
+            topic_lengths.append(len(topic_words))
+            unique_words.update(topic_words)
+            word_weights.extend([weight for _, weight in words_weights[:10]])
+
+        avg_topic_length = np.mean(topic_lengths) if topic_lengths else 0
+        total_unique_words = len(unique_words)
+        avg_word_weight = np.mean(word_weights) if word_weights else 0
+        weight_std = np.std(word_weights) if word_weights else 0
+
+        # Pseudo-coherence score berdasarkan metrik sederhana
+        # Ini bukan coherence sejati, tapi memberikan indikasi kualitas topik
+        pseudo_coherence = min(1.0, (avg_topic_length / 10.0) * (total_unique_words / len(topics) / 10.0))
+
+        results = {
+            'overall_coherence': pseudo_coherence,
+            'method': 'fallback',
+            'avg_topic_length': avg_topic_length,
+            'total_unique_words': total_unique_words,
+            'num_topics': len(topics),
+            'avg_word_weight': avg_word_weight,
+            'weight_std': weight_std,
+            'note': 'Ini adalah pseudo-coherence tanpa gensim. Install gensim untuk coherence yang akurat.'
+        }
+
+        logging.info(f"Fallback coherence calculated: {pseudo_coherence:.4f}")
+        return results
+
+    except Exception as e:
+        logging.error(f"Error in fallback coherence: {e}")
+        return {"error": f"Error dalam fallback coherence: {str(e)}"}
     """Hitung metrik evaluasi topic modeling tambahan"""
     logging.info("Menghitung topic metrics tambahan")
     
@@ -747,6 +835,27 @@ if uploaded_file:
             topic_validation_df.to_csv(os.path.join(results_dir, f"topic_validation_{timestamp}.csv"), index=False)
             
             coherence_results = calculate_topic_coherence(topic_model, docs)
+            if "error" in coherence_results:
+                st.warning(f"⚠️ **Topic Coherence Evaluation**\n\n{coherence_results['error']}")
+                st.info("� **Menggunakan metode fallback...**")
+
+                # Try fallback method
+                fallback_results = calculate_topic_coherence_fallback(topic_model, docs)
+                if "error" not in fallback_results:
+                    st.success("✅ Fallback coherence berhasil dihitung!")
+                    st.metric("🎯 Pseudo Coherence (Fallback)", f"{fallback_results['overall_coherence']:.4f}")
+                    st.info("💡 **Catatan:** Ini adalah estimasi coherence tanpa gensim. Install gensim untuk hasil yang akurat.")
+                    coherence_results = fallback_results
+                else:
+                    st.error(f"❌ Bahkan fallback coherence gagal: {fallback_results['error']}")
+                    coherence_results = {"error": "Coherence calculation failed", "fallback_error": fallback_results['error']}
+
+                st.info("💡 **Solusi:** Jalankan `pip install gensim>=4.0.0` di terminal untuk mengaktifkan evaluasi coherence yang akurat.")
+            else:
+                st.success("✅ Topic Coherence berhasil dihitung!")
+                st.metric("🎯 Overall Coherence", f"{coherence_results['overall_coherence']:.4f}")
+
+            # Save coherence results
             with open(os.path.join(results_dir, f"coherence_results_{timestamp}.json"), "w") as f:
                 json.dump(coherence_results, f)
             
