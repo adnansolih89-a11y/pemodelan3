@@ -1,5 +1,5 @@
 [server]
-port = 5000
+port = 8501
 address = "0.0.0.0"
 headless = true
 
@@ -8,6 +8,12 @@ primaryColor = "#667eea"
 backgroundColor = "#ffffff"
 secondaryBackgroundColor = "#f0f2f6"
 textColor = "#262730"
+font = "sans serif"
+
+[client]
+showErrorDetails = true
+toolbarMode = "developer"
+
 font = "sans serif"
 
 [logger]
