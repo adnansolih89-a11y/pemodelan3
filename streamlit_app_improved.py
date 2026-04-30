@@ -274,7 +274,19 @@ def calculate_topic_coherence_fallback(_topic_model, _docs):
     except Exception as e:
         logging.error(f"Error in fallback coherence: {e}")
         return {"error": f"Error dalam fallback coherence: {str(e)}"}
-    """Hitung metrik evaluasi topic modeling tambahan"""
+
+@st.cache_data
+def calculate_topic_metrics(_topic_model, _docs):
+    """
+    Hitung metrik evaluasi topic modeling tambahan
+    
+    Args:
+        _topic_model: Fitted BERTopic model
+        _docs: List of preprocessed documents
+    
+    Returns:
+        dict: Various topic modeling metrics
+    """
     logging.info("Menghitung topic metrics tambahan")
     
     try:

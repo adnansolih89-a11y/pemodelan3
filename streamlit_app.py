@@ -76,6 +76,7 @@ def calculate_topic_coherence(_topic_model, _docs, coherence_type='c_v'):
     try:
         from gensim.models import CoherenceModel
         from gensim.corpora import Dictionary
+        logging.info("Gensim imported successfully in calculate_topic_coherence")
     except ImportError as e:
         logging.error(f"Gensim not available: {e}")
         return {"error": "Gensim library not available. Please install gensim to calculate coherence."}
