@@ -143,33 +143,30 @@ def calculate_topic_coherence(_topic_model, _docs, coherence_type='c_v'):
             logging.info("Gensim modules imported successfully")
         except ImportError as e:
             logging.error(f"Gensim import failed: {e}")
-            # Try alternative import paths
-            try:
-                import gensim
-                from gensim.models.coherencemodel import CoherenceModel
-                from gensim.corpora.dictionary import Dictionary
-                logging.info("Alternative gensim imports successful")
-            except ImportError as e2:
-                logging.error(f"Alternative gensim import also failed: {e2}")
-                return {"error": f"Gensim library tidak tersedia. Error: {str(e)}. Silakan install dengan: pip install gensim"}
+            logging.info("Falling back to coherence calculation tanpa gensim")
+            return calculate_topic_coherence_fallback(_topic_model, _docs)
 
     except Exception as e:
         logging.error(f"Unexpected error during gensim import: {e}")
-        return {"error": f"Error importing gensim: {str(e)}. Pastikan gensim terinstall dengan benar."}
+        logging.info("Falling back to coherence calculation tanpa gensim")
+        return calculate_topic_coherence_fallback(_topic_model, _docs)
 
     try:
+        from gensim.corpora import Dictionary
+        from gensim.models import CoherenceModel
+        
         topics = _topic_model.get_topics()
         topics = {k: v for k, v in topics.items() if k != -1}
 
         if not topics:
             logging.warning("Tidak ada topik valid untuk coherence calculation")
-            return {"error": "Tidak ada topik valid ditemukan"}
+            return calculate_topic_coherence_fallback(_topic_model, _docs)
 
         # Prepare documents for coherence calculation
         tokenized_docs = [doc.split() for doc in _docs if doc.strip()]
 
         if not tokenized_docs:
-            return {"error": "Tidak ada dokumen yang valid untuk coherence calculation"}
+            return calculate_topic_coherence_fallback(_topic_model, _docs)
 
         # Create dictionary and corpus
         try:
@@ -177,12 +174,12 @@ def calculate_topic_coherence(_topic_model, _docs, coherence_type='c_v'):
             dictionary.filter_extremes(no_below=5, no_above=0.5)
 
             if len(dictionary) == 0:
-                return {"error": "Dictionary kosong setelah filtering. Coba kurangi no_below atau tingkatkan jumlah dokumen."}
+                return calculate_topic_coherence_fallback(_topic_model, _docs)
 
             corpus = [dictionary.doc2bow(doc) for doc in tokenized_docs]
         except Exception as e:
             logging.error(f"Error creating dictionary/corpus: {e}")
-            return {"error": f"Error preparing data untuk coherence: {str(e)}"}
+            return calculate_topic_coherence_fallback(_topic_model, _docs)
 
         # Prepare topic words
         topic_words = []
@@ -192,7 +189,7 @@ def calculate_topic_coherence(_topic_model, _docs, coherence_type='c_v'):
                 topic_words.append(words)
 
         if not topic_words:
-            return {"error": "Tidak ada topic words yang valid"}
+            return calculate_topic_coherence_fallback(_topic_model, _docs)
 
         # Calculate coherence
         try:
@@ -219,11 +216,11 @@ def calculate_topic_coherence(_topic_model, _docs, coherence_type='c_v'):
 
         except Exception as e:
             logging.error(f"Error during coherence calculation: {e}")
-            return {"error": f"Error menghitung coherence: {str(e)}. Coba gunakan coherence_type yang berbeda."}
+            return calculate_topic_coherence_fallback(_topic_model, _docs)
 
     except Exception as e:
         logging.error(f"Unexpected error in coherence calculation: {e}")
-        return {"error": f"Error tak terduga: {str(e)}"}
+        return calculate_topic_coherence_fallback(_topic_model, _docs)
 
 @st.cache_data
 def calculate_topic_coherence_fallback(_topic_model, _docs):
