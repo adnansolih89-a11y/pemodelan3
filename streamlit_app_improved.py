@@ -107,7 +107,11 @@ def load_embedding_model(_version="v2"):
 def load_sentiment_model(_version="v2"):
     """Load sentiment analysis model"""
     logging.info("Starting load_sentiment_model")
-    model = pipeline("sentiment-analysis", model="cardiffnlp/twitter-roberta-base-sentiment-latest")
+    try:
+        model = pipeline("sentiment-analysis", model="cardiffnlp/twitter-roberta-base-sentiment-latest", device=-1)
+    except Exception as e:
+        logging.warning(f"Failed to load cardiffnlp model: {e}, using default sentiment model")
+        model = pipeline("sentiment-analysis")
     logging.info("Completed load_sentiment_model")
     return model
 
@@ -790,29 +794,36 @@ if uploaded_file:
                     
                     with col2:
                         if selected_topic_wc is not None:
-                            topic_words = topic_model.get_topic(selected_topic_wc)
-                            if topic_words:
-                                word_freq = {word: weight for word, weight in topic_words}
+                            try:
+                                # Ensure selected_topic_wc is an integer
+                                topic_id = int(selected_topic_wc) if isinstance(selected_topic_wc, str) else selected_topic_wc
+                                topic_words = topic_model.get_topic(topic_id)
                                 
-                                wordcloud = WordCloud(
-                                    width=800, 
-                                    height=400, 
-                                    background_color='white',
-                                    colormap='viridis',
-                                    max_words=50
-                                ).generate_from_frequencies(word_freq)
-                                
-                                fig_wc, ax = plt.subplots(figsize=(10, 5))
-                                ax.imshow(wordcloud, interpolation='bilinear')
-                                ax.axis('off')
-                                ax.set_title(f'Word Cloud - Topic {selected_topic_wc}', fontsize=16, pad=20)
-                                st.pyplot(fig_wc)
-                                
-                                fig_wc.savefig(os.path.join(results_dir, f"wordcloud_topic_{selected_topic_wc}_{timestamp}.png"))
-                                
-                                with st.expander("📝 Top Words & Weights"):
-                                    words_df = pd.DataFrame(topic_words, columns=['Word', 'Weight'])
-                                    st.dataframe(words_df.head(20), use_container_width=True)
+                                if topic_words and isinstance(topic_words, list):
+                                    word_freq = {word: weight for word, weight in topic_words}
+                                    
+                                    wordcloud = WordCloud(
+                                        width=800, 
+                                        height=400, 
+                                        background_color='white',
+                                        colormap='viridis',
+                                        max_words=50
+                                    ).generate_from_frequencies(word_freq)
+                                    
+                                    fig_wc, ax = plt.subplots(figsize=(10, 5))
+                                    ax.imshow(wordcloud, interpolation='bilinear')
+                                    ax.axis('off')
+                                    ax.set_title(f'Word Cloud - Topic {topic_id}', fontsize=16, pad=20)
+                                    st.pyplot(fig_wc)
+                                    
+                                    fig_wc.savefig(os.path.join(results_dir, f"wordcloud_topic_{topic_id}_{timestamp}.png"))
+                                    
+                                    with st.expander("📝 Top Words & Weights"):
+                                        words_df = pd.DataFrame(topic_words, columns=['Word', 'Weight'])
+                                        st.dataframe(words_df.head(20), use_container_width=True)
+                            except Exception as e:
+                                logging.error(f"Error generating wordcloud for topic {selected_topic_wc}: {e}")
+                                st.warning(f"Could not generate wordcloud: {str(e)}")
             
             st.write("### 📌 Top Topics")
             top_topics_df = topic_model.get_topic_info()
@@ -825,7 +836,8 @@ if uploaded_file:
             
             topic_validation_df = top_topics_df[top_topics_df['Topic'] != -1][['Topic', 'Name']].copy()
             topic_validation_df['Top Words'] = topic_validation_df['Topic'].apply(
-                lambda topic_id: ", ".join([word for word, _ in topic_model.get_topic(int(topic_id))[:10]])
+                lambda topic_id: ", ".join([word for word, _ in topic_model.get_topic(topic_id)[:10]]) 
+                if topic_model.get_topic(topic_id) else "N/A"
             )
             st.session_state['topic_validation_df'] = topic_validation_df
             
