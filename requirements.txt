@@ -15,5 +15,4 @@ matplotlib
 Cython
 streamlit-lottie>=0.0.5
 requests
-gensim
 gensim>=4.0.0
